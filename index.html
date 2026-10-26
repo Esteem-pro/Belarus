@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Прайс-лист и Калькулятор</title>
+    
+    <!-- Шрифты и библиотеки -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f1f5f9; 
+            color: #0f172a; 
+            height: 100dvh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            touch-action: manipulation;
+            -webkit-font-smoothing: antialiased;
+        }
+        button, input, select, textarea { touch-action: manipulation; }
+
+        .scroll-area { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px); 
+        }
+        .scroll-area::-webkit-scrollbar { width: 6px; }
+        .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        body.modal-open { overflow: hidden; touch-action: none; }
+
+        /* Позиционирование липкого поиска и корзины без верхнего навбара */
+        #search-container {
+            top: 16px;
+        }
+
+        @media (min-width: 768px) {
+            #esCartWidget {
+                top: 88px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .mobile-cart-sheet { max-height: 62px; transition: max-height 0.4s cubic-bezier(0.2, 1, 0.3, 1); }
+            .mobile-cart-sheet.is-open { max-height: 82dvh; }
+            .mobile-cart-content { opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+            .mobile-cart-sheet.is-open .mobile-cart-content { opacity: 1; pointer-events: auto; transition: opacity 0.3s ease 0.15s; }
+            .mobile-cart-sheet:not(.is-open) .cart-header-border { border-color: transparent; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ОБЛАСТЬ ПРОКРУТКИ -->
+    <div class="scroll-area flex flex-col w-full relative">
+        
+        <!-- ЛИПКИЙ ПОИСК -->
+        <div id="search-container" class="sticky z-40 w-full pointer-events-none mb-5 sm:mb-7 mt-4 sm:mt-6">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 pointer-events-auto w-full">
+                <div class="relative shadow-[0_8px_30px_rgb(0,0,0,0.06)] rounded-[1.2rem]">
+                    <input type="text" id="esSearch" 
+                        class="w-full bg-white/85 backdrop-blur-xl border border-white/60 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-[1.2rem] px-5 py-3.5 pl-12 outline-none transition-all text-slate-800 placeholder-slate-400 font-medium text-base" 
+                        placeholder="Поиск товаров и комплектаций...">
+                    <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row gap-6 items-start w-full">
+            
+            <!-- СЕТКА КАТАЛОГА -->
+            <div class="flex-1 w-full">
+                <div id="esGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-5">
+                </div>
+            </div>
+
+            <!-- КОРЗИНА -->
+            <div id="esCartWidget" class="mobile-cart-sheet md:transform-none fixed md:sticky bottom-4 inset-x-0 md:bottom-auto z-50 md:z-10 w-full md:w-80 lg:w-96 bg-transparent flex flex-col mx-auto px-4 sm:px-6 md:px-0 md:max-h-[calc(100vh-110px)] md:mt-0">
+                <div class="bg-white rounded-[1.2rem] md:rounded-[1.5rem] border border-slate-200/80 shadow-[0_12px_40px_-10px_rgba(0,0,0,0.15)] md:shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] flex flex-col flex-1 min-h-0 overflow-hidden">
+                    
+                    <div class="cart-header-border p-4 sm:p-5 border-b border-slate-100 flex justify-between items-center bg-slate-900 md:bg-white text-white md:text-slate-900 cursor-pointer md:cursor-default transition-colors shrink-0 touch-none md:touch-auto" onclick="toggleMobileCart()">
+                        <div class="flex items-center gap-2">
+                            <h2 class="font-extrabold text-lg">Корзина</h2>
+                            <span id="cart-count-badge" class="bg-blue-500 md:bg-slate-100 md:text-slate-600 text-white text-xs font-bold px-2 py-0.5 rounded-full hidden">0</span>
+                        </div>
+                        <svg id="mobile-cart-arrow" class="w-6 h-6 md:hidden transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
+                    </div>
+
+                    <div class="mobile-cart-content flex flex-col flex-1 overflow-hidden min-h-0">
+                        <div id="esCartItems" class="flex-1 overflow-y-auto overscroll-y-contain p-4 bg-[#f1f5f9]/50">
+                            <div class="text-center py-8 text-slate-400 font-medium text-sm">Корзина пуста</div>
+                        </div>
+                        
+                        <!-- ИТОГИ КОРЗИНЫ ПО 4 ЦЕНАМ -->
+                        <div class="p-4 sm:p-5 bg-white border-t border-slate-100 shrink-0">
+                            <div class="space-y-2 mb-4">
+                                <div class="flex justify-between items-baseline">
+                                    <span class="text-slate-500 text-xs font-semibold">Итоговая, Руб РФ:</span>
+                                    <span id="esTotalRub" class="text-xl font-extrabold text-slate-900 tracking-tight">0 ₽</span>
+                                </div>
+                                
+                                <div class="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
+                                    <div class="bg-slate-50 p-2 rounded-lg border border-slate-200/60">
+                                        <div class="text-[10px] font-semibold text-slate-400 uppercase leading-none mb-1">Закупка РФ</div>
+                                        <div id="esTotalBuy" class="text-xs font-bold text-slate-700 truncate">0 ₽</div>
+                                    </div>
+                                    <div class="bg-emerald-50/60 p-2 rounded-lg border border-emerald-200/60">
+                                        <div class="text-[10px] font-semibold text-emerald-600/80 uppercase leading-none mb-1">Итого USD</div>
+                                        <div id="esTotalUsd" class="text-xs font-bold text-emerald-700 truncate">0 $</div>
+                                    </div>
+                                    <div class="bg-indigo-50/60 p-2 rounded-lg border border-indigo-200/60">
+                                        <div class="text-[10px] font-semibold text-indigo-600/80 uppercase leading-none mb-1">Итого РБ</div>
+                                        <div id="esTotalByn" class="text-xs font-bold text-indigo-700 truncate">0 BYN</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold p-3 rounded-[1rem] transition-colors text-sm" onclick="clearCart(event)">
+                                Очистить корзину
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО -->
+    <div id="esModal" class="fixed top-0 left-0 w-full h-[100dvh] bg-slate-900/40 backdrop-blur-sm z-[100] hidden items-center justify-center p-3 sm:p-6">
+        <div class="bg-white rounded-[1.5rem] shadow-2xl max-w-xl w-full flex flex-col max-h-[90dvh] overflow-hidden transform transition-all relative">
+            <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-start bg-slate-50/50 shrink-0">
+                <h3 id="esModalTitle" class="font-extrabold text-slate-900 text-lg pr-4 leading-snug">Товар</h3>
+                <button onclick="closeModal()" class="w-8 h-8 flex items-center justify-center bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-full transition-colors shrink-0 mt-0.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="p-4 sm:p-5 overflow-y-auto flex-1">
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Комплектация (База)</div>
+                <div id="esBasesList" class="space-y-2.5"></div>
+                
+                <div id="esAddonsContainer" class="mt-6 hidden">
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Дополнительные опции</div>
+                    <div id="esAddonsList" class="space-y-2.5"></div>
+                </div>
+            </div>
+            
+            <div class="px-5 py-4 border-t border-slate-100 bg-slate-50 flex flex-col gap-3 shrink-0">
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-slate-600 text-sm">Количество базовых комплектов:</span>
+                    <div class="flex items-center gap-3 bg-white border border-slate-200 p-1 rounded-full shadow-sm">
+                        <button class="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 font-bold transition-colors" onclick="changeBaseQty(-1)">-</button>
+                        <span id="esBaseQtyVal" class="w-6 text-center font-bold text-slate-900 text-sm">1</span>
+                        <button class="w-7 h-7 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 font-bold transition-colors" onclick="changeBaseQty(1)">+</button>
+                    </div>
+                </div>
+                
+                <!-- БЛОК ИТОГОВЫХ ЦЕН В МОДАЛКЕ -->
+                <div class="pt-3 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex-1">
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-xs font-semibold text-slate-400">Итого РФ:</span>
+                            <div id="esModalPriceRub" class="text-xl sm:text-2xl font-extrabold text-slate-900">0 ₽</div>
+                        </div>
+                        <div class="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-xs">
+                            <span class="text-slate-500">Закупка: <strong id="esModalPriceBuy" class="text-slate-700">0 ₽</strong></span>
+                            <span class="text-emerald-600">USD: <strong id="esModalPriceUsd" class="text-emerald-700">0 $</strong></span>
+                            <span class="text-indigo-600">РБ: <strong id="esModalPriceByn" class="text-indigo-700">0 BYN</strong></span>
+                        </div>
+                    </div>
+                    <button id="esModalBtn" class="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold transition-colors shrink-0 w-full sm:w-auto text-center" onclick="confirmAddToCart()">В корзину</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================================
+        // ИНДЕКСЫ СТОЛБЦОВ ГУГЛ ТАБЛИЦЫ (A=0, B=1 пропускаем, C=2, D=3, E=4, F=5)
+        // ==========================================================
+        const COL_NAME = 0;      // A — Наименование позиции / категории
+        // Столбец B (индекс 1) — техническое поле, полностью игнорируется
+        const COL_BUY_RUB = 2;   // C — Цена закупки, Руб РФ
+        const COL_FINAL_RUB = 3; // D — Итоговая стоимость, Руб РФ
+        const COL_FINAL_USD = 4; // E — Итоговая стоимость, Доллары
+        const COL_FINAL_BYN = 5; // F — Итоговая стоимость, Руб РБ
+
+        // Замените ссылку ниже на CSV-ссылку вашей новой таблицы при необходимости
+        const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fReX-VT02iS-FuldAJmU2LM--lmwIx-cI11lmwNLL-lAaUTHB9_Vqy61S6NCPt6rk-f4/pub?gid=0&single=true&output=csv" + "&t=" + new Date().getTime();
+
+        const PRICE_KEYS = ['buyRub', 'finalRub', 'finalUsd', 'finalByn'];
+        const CURRENCY_META = {
+            buyRub:   { symbol: '₽',   label: 'Закупка РФ' },
+            finalRub: { symbol: '₽',   label: 'Итого РФ' },
+            finalUsd: { symbol: '$',   label: 'Итого USD' },
+            finalByn: { symbol: 'BYN', label: 'Итого РБ' }
+        };
+
+        let database = [];
+        let cart = [];
+        let catalogMemory = {}; 
+        let currentSelection = null;
+
+        const _RU_FMT = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 });
+        const fmtCurr = (n, key = 'finalRub') => {
+            const val = Math.round((+n || 0) * 100) / 100;
+            const sym = CURRENCY_META[key] ? CURRENCY_META[key].symbol : '₽';
+            return `${_RU_FMT.format(val)} ${sym}`;
+        };
+
+        const esc = (str) => {
+            if (!str) return '';
+            return String(str).replace(/[&<>'"]/g, match => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+            })[match]);
+        };
+
+        document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', function (event) {
+            let now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) { event.preventDefault(); }
+            lastTouchEnd = now;
+        }, false);
+
+        // Форматирование одиночной цены (число / процент / по запросу)
+        function formatSinglePrice(pObj, key) {
+            if (!pObj) return fmtCurr(0, key);
+            if (pObj.isRequest) return "По запросу";
+            if (pObj.isPercent) return `${pObj.val}%`;
+            return fmtCurr(pObj.val, key);
+        }
+
+        // Парсинг ячейки цены (поддержка дробных чисел для USD/BYN, процентов и "по запросу")
+        function parsePrice(str) {
+            if (str === undefined || str === null) return { val: 0, isPercent: false, isRequest: false };
+            let s = str.toString().trim();
+            if (!s) return { val: 0, isPercent: false, isRequest: false };
+
+            if (s.includes('%')) {
+                return { val: parseFloat(s.replace(',', '.').replace(/[^0-9.]/g, '')) || 0, isPercent: true, isRequest: false };
+            }
+            if (s.toLowerCase().includes('запрос')) {
+                return { val: 0, isPercent: false, isRequest: true };
+            }
+            // Поддержка пробелов-разделителей тысяч и запятой/точки для дробной части
+            let normalized = s.replace(/\s+/g, '').replace(',', '.').replace(/[^0-9.]/g, '');
+            let parts = normalized.split('.');
+            if (parts.length > 2) {
+                normalized = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
+            }
+            return { val: parseFloat(normalized) || 0, isPercent: false, isRequest: false };
+        }
+
+        function parseItemPrices(row) {
+            return {
+                buyRub:   parsePrice(row[COL_BUY_RUB]),
+                finalRub: parsePrice(row[COL_FINAL_RUB]),
+                finalUsd: parsePrice(row[COL_FINAL_USD]),
+                finalByn: parsePrice(row[COL_FINAL_BYN])
+            };
+        }
+
+        function renderSkeleton() {
+            const grid = document.getElementById('esGrid');
+            if (!grid || database.length > 0) return;
+            const cardHtml = `
+                <div class="bg-white p-4 sm:p-5 rounded-[1.5rem] border border-slate-200 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] animate-pulse flex flex-col justify-between min-h-[160px]">
+                    <div class="h-4 bg-slate-200 rounded w-3/4 mb-3"></div>
+                    <div class="h-4 bg-slate-200 rounded w-1/2 mb-5"></div>
+                    <div class="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-slate-100">
+                        <div class="h-8 bg-slate-100 rounded-lg"></div>
+                        <div class="h-8 bg-slate-100 rounded-lg"></div>
+                        <div class="h-8 bg-slate-100 rounded-lg"></div>
+                        <div class="h-8 bg-slate-100 rounded-lg"></div>
+                    </div>
+                </div>`;
+            grid.innerHTML = cardHtml.repeat(6);
+        }
+
+        if (typeof Papa === 'undefined') { setTimeout(initApp, 1000); } else { initApp(); }
+
+        function initApp() {
+            renderSkeleton();
+            Papa.parse(SHEET_URL, {
+                download: true,
+                header: false,
+                complete: function(results) { processData(results.data); },
+                error: function() {
+                    if (database.length === 0) {
+                        document.getElementById('esGrid').innerHTML = "<div class='col-span-full text-center text-rose-500 py-10 font-medium'>Ошибка загрузки данных</div>";
+                    }
+                }
+            });
+        }
+
+        // ==========================================================
+        // ОСНОВНОЙ МОДУЛЬ РЕНДЕРА И КЭШИРОВАНИЯ (v2.2 Multi-Currency)
+        // ==========================================================
+        (() => {
+            const CACHE_KEY_CSV = 'es_mc_catalog_csv_v1';
+            const CACHE_KEY_CART = 'es_mc_catalog_cart_v1';
+            const CACHE_KEY_MEM = 'es_mc_catalog_mem_v1';
+
+            let _catalogCards = [];
+            let _emptyStateEl = null;
+            let _mobileCartTimer = null;
+            let _lastCsvHash = '';
+
+            function _loadPersistedCart() {
+                try {
+                    const savedCart = sessionStorage.getItem(CACHE_KEY_CART);
+                    const savedMem = sessionStorage.getItem(CACHE_KEY_MEM);
+                    if (savedCart) cart = JSON.parse(savedCart) || [];
+                    if (savedMem) catalogMemory = JSON.parse(savedMem) || {};
+                } catch (e) {
+                    cart = [];
+                    catalogMemory = {};
+                }
+            }
+
+            function _savePersistedCart() {
+                try {
+                    sessionStorage.setItem(CACHE_KEY_CART, JSON.stringify(cart));
+                    sessionStorage.setItem(CACHE_KEY_MEM, JSON.stringify(catalogMemory));
+                } catch (e) {}
+            }
+
+            // Вычисление минимальной цены группы по конкретному ключу валюты
+            function _calcGroupMinText(group, key) {
+                let minP = Infinity;
+                for (let i = 0; i < group.items.length; i++) {
+                    const pObj = group.items[i].prices[key];
+                    if (pObj && !pObj.isPercent && !pObj.isRequest && pObj.val > 0 && pObj.val < minP) {
+                        minP = pObj.val;
+                    }
+                }
+                if (minP !== Infinity && minP > 0) return `от ${fmtCurr(minP, key)}`;
+                if (group.items.some(i => i.prices[key] && i.prices[key].isPercent)) return "Расчет %";
+                return "По запросу";
+            }
+
+            window.processData = function(rows) {
+                if (!rows || !rows.length) return;
+
+                const rawHash = JSON.stringify(rows);
+                if (rawHash === _lastCsvHash && database.length > 0) return;
+                _lastCsvHash = rawHash;
+
+                try {
+                    sessionStorage.setItem(CACHE_KEY_CSV, rawHash);
+                } catch (e) {}
+
+                database = [];
+                let currentGroup = null;
+                let isAddons = false;
+
+                for (let r = 0; r < rows.length; r++) {
+                    const row = rows[r];
+                    if (!row || !row[COL_NAME]) continue;
+                    const name = String(row[COL_NAME]).trim();
+                    if (name === "") continue;
+
+                    const nameLower = name.toLowerCase();
+
+                    // Проверяем, пусты ли все 4 ценовых столбца (C, D, E, F)
+                    const hasAnyPrice = [row[COL_BUY_RUB], row[COL_FINAL_RUB], row[COL_FINAL_USD], row[COL_FINAL_BYN]]
+                        .some(cell => cell !== undefined && cell !== null && String(cell).trim() !== "");
+
+                    const isServiceRow = nameLower.includes("позиция")
+                        || nameLower.includes("себестоимость")
+                        || nameLower.includes("цена закупки")
+                        || nameLower.includes("итоговая стоимость")
+                        || nameLower.includes("наименование");
+
+                    const isHeader = !hasAnyPrice && !isServiceRow;
+
+                    if (nameLower.includes("доп. элементы")) {
+                        isAddons = true;
+                        continue;
+                    }
+
+                    if (isHeader) {
+                        currentGroup = { title: name, items: [], addons: [] };
+                        database.push(currentGroup);
+                        isAddons = false;
+                    } else if (currentGroup && !isServiceRow) {
+                        const item = {
+                            name,
+                            prices: parseItemPrices(row)
+                        };
+                        if (isAddons) currentGroup.addons.push(item);
+                        else currentGroup.items.push(item);
+                    }
+                }
+
+                database = database.filter(g => g.items.length > 0 || g.addons.length > 0);
+
+                database.forEach(group => {
+                    group._minPrices = {
+                        buyRub:   _calcGroupMinText(group, 'buyRub'),
+                        finalRub: _calcGroupMinText(group, 'finalRub'),
+                        finalUsd: _calcGroupMinText(group, 'finalUsd'),
+                        finalByn: _calcGroupMinText(group, 'finalByn')
+                    };
+
+                    group._searchStr = (
+                        group.title + ' ' +
+                        group.items.map(i => i.name).join(' ') + ' ' +
+                        group.addons.map(a => a.name).join(' ')
+                    ).toLowerCase();
+                });
+
+                _buildCatalogDOMOnce();
+                const searchInput = document.getElementById('esSearch');
+                renderCatalog(searchInput ? searchInput.value : "");
+            };
+
+            function _buildCatalogDOMOnce() {
+                const grid = document.getElementById('esGrid');
+                if (!grid) return;
+
+                const frag = document.createDocumentFragment();
+                _catalogCards = [];
+
+                database.forEach((group, idx) => {
+                    const mp = group._minPrices;
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-4 sm:p-5 rounded-[1.5rem] border border-slate-200 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] hover:border-blue-400 hover:shadow-[0_8px_25px_-5px_rgba(0,0,0,0.06)] hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[165px] relative group';
+                    card.onclick = () => openModalFromCatalog(idx);
+                    card.innerHTML = `
+                        <div class="font-bold text-slate-800 text-sm sm:text-base leading-snug mb-4 group-hover:text-blue-700 transition-colors">${esc(group.title)}</div>
+                        <div class="mt-auto pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
+                            <div class="bg-blue-50/70 px-2.5 py-1.5 rounded-xl border border-blue-100">
+                                <div class="text-[10px] font-bold text-blue-500 uppercase tracking-tight">Итого РФ</div>
+                                <div class="font-extrabold text-blue-700 text-xs sm:text-sm truncate">${mp.finalRub}</div>
+                            </div>
+                            <div class="bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200/70">
+                                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Закупка РФ</div>
+                                <div class="font-bold text-slate-700 text-xs sm:text-sm truncate">${mp.buyRub}</div>
+                            </div>
+                            <div class="bg-emerald-50/60 px-2.5 py-1.5 rounded-xl border border-emerald-100">
+                                <div class="text-[10px] font-semibold text-emerald-600 uppercase tracking-tight">Итого USD</div>
+                                <div class="font-bold text-emerald-700 text-xs sm:text-sm truncate">${mp.finalUsd}</div>
+                            </div>
+                            <div class="bg-indigo-50/60 px-2.5 py-1.5 rounded-xl border border-indigo-100">
+                                <div class="text-[10px] font-semibold text-indigo-500 uppercase tracking-tight">Итого РБ</div>
+                                <div class="font-bold text-indigo-700 text-xs sm:text-sm truncate">${mp.finalByn}</div>
+                            </div>
+                        </div>
+                    `;
+                    frag.appendChild(card);
+                    _catalogCards.push({ el: card, searchStr: group._searchStr });
+                });
+
+                _emptyStateEl = document.createElement('div');
+                _emptyStateEl.className = 'col-span-full text-center text-slate-500 py-10 font-medium hidden';
+                _emptyStateEl.textContent = 'Ничего не найдено';
+                frag.appendChild(_emptyStateEl);
+
+                grid.innerHTML = '';
+                grid.appendChild(frag);
+            }
+
+            window.renderCatalog = function(filter = "") {
+                if (_catalogCards.length === 0 && database.length > 0) {
+                    _buildCatalogDOMOnce();
+                }
+                const lower = filter.trim().toLowerCase();
+                let visibleCount = 0;
+
+                for (let i = 0; i < _catalogCards.length; i++) {
+                    const item = _catalogCards[i];
+                    const match = !lower || item.searchStr.includes(lower);
+                    item.el.classList.toggle('hidden', !match);
+                    if (match) visibleCount++;
+                }
+
+                if (_emptyStateEl) {
+                    _emptyStateEl.classList.toggle('hidden', visibleCount > 0 || database.length === 0);
+                }
+            };
+
+            window.openModalFromCatalog = function(idx) {
+                let saved = catalogMemory[idx];
+                if (saved) {
+                    currentSelection = JSON.parse(JSON.stringify(saved));
+                    currentSelection.mode = 'new';
+                    currentSelection.cartIdx = -1;
+                } else {
+                    currentSelection = { groupIdx: idx, baseIdx: 0, baseQty: 1, addons: {}, mode: 'new', cartIdx: -1 };
+                }
+                renderModalContent();
+            };
+
+            window.openModalFromCart = function(cartIndex) {
+                const item = cart[cartIndex];
+                if (!item) return;
+                const groupIdx = database.findIndex(g => g.title === item.title);
+                if (groupIdx === -1) return;
+
+                const group = database[groupIdx];
+                const addonsMap = {};
+                (item.addons || []).forEach(savedAddon => {
+                    const foundIdx = group.addons.findIndex(a => a.name === savedAddon.name);
+                    if (foundIdx !== -1) addonsMap[foundIdx] = savedAddon.qty;
+                });
+                let baseIdx = group.items.findIndex(b => b.name === item.base.name);
+                if (baseIdx === -1) baseIdx = 0;
+
+                currentSelection = {
+                    groupIdx,
+                    baseIdx,
+                    baseQty: item.baseQty,
+                    addons: addonsMap,
+                    mode: 'edit',
+                    cartIdx: cartIndex
+                };
+                renderModalContent();
+            };
+
+            function _renderFourPricesBadges(prices) {
+                return `
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2 pt-2 border-t border-slate-200/50 text-[11px]">
+                        <div class="bg-blue-50/80 px-2 py-1 rounded-lg">
+                            <span class="text-blue-500 font-medium block text-[9px] uppercase">Итого РФ</span>
+                            <span class="font-extrabold text-blue-700">${formatSinglePrice(prices.finalRub, 'finalRub')}</span>
+                        </div>
+                        <div class="bg-slate-100/80 px-2 py-1 rounded-lg">
+                            <span class="text-slate-400 font-medium block text-[9px] uppercase">Закупка РФ</span>
+                            <span class="font-bold text-slate-700">${formatSinglePrice(prices.buyRub, 'buyRub')}</span>
+                        </div>
+                        <div class="bg-emerald-50/80 px-2 py-1 rounded-lg">
+                            <span class="text-emerald-600 font-medium block text-[9px] uppercase">Итого USD</span>
+                            <span class="font-bold text-emerald-700">${formatSinglePrice(prices.finalUsd, 'finalUsd')}</span>
+                        </div>
+                        <div class="bg-indigo-50/80 px-2 py-1 rounded-lg">
+                            <span class="text-indigo-500 font-medium block text-[9px] uppercase">Итого РБ</span>
+                            <span class="font-bold text-indigo-700">${formatSinglePrice(prices.finalByn, 'finalByn')}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            window.renderModalContent = function() {
+                const group = database[currentSelection.groupIdx];
+                if (!group) return;
+
+                document.getElementById('esModalTitle').innerText = (currentSelection.mode === 'edit' ? "Редактирование" : group.title);
+                const btn = document.getElementById('esModalBtn');
+                if (currentSelection.mode === 'edit') {
+                    btn.innerText = "Сохранить";
+                    btn.className = "bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold transition-colors shrink-0 w-full sm:w-auto text-center";
+                } else {
+                    btn.innerText = "В корзину";
+                    btn.className = "bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold transition-colors shrink-0 w-full sm:w-auto text-center";
+                }
+
+                const emptyPrices = {
+                    buyRub:   { val: 0, isPercent: false, isRequest: false },
+                    finalRub: { val: 0, isPercent: false, isRequest: false },
+                    finalUsd: { val: 0, isPercent: false, isRequest: false },
+                    finalByn: { val: 0, isPercent: false, isRequest: false }
+                };
+
+                const bList = document.getElementById('esBasesList');
+                const bases = group.items.length ? group.items : [{ name: "База", prices: emptyPrices }];
+
+                bList.innerHTML = bases.map((item, i) => {
+                    const isActive = (i === currentSelection.baseIdx);
+                    const activeClasses = isActive
+                        ? "border-blue-600 bg-blue-50/40 ring-1 ring-blue-600 shadow-sm"
+                        : "border-slate-200 bg-white hover:border-blue-300";
+                    const radioStyle = isActive
+                        ? "border-[5px] border-blue-600 bg-white"
+                        : "border-2 border-slate-300 bg-white";
+
+                    return `
+                        <div data-base-row="${i}" class="p-3 rounded-xl border ${activeClasses} cursor-pointer transition-all" onclick="selectBase(${i})">
+                            <div class="flex items-center gap-3">
+                                <div data-base-radio="${i}" class="w-5 h-5 rounded-full flex-shrink-0 ${radioStyle} shadow-sm transition-all"></div>
+                                <span data-base-title="${i}" class="font-semibold text-sm ${isActive ? 'text-blue-950' : 'text-slate-800'}">${esc(item.name)}</span>
+                            </div>
+                            ${_renderFourPricesBadges(item.prices)}
+                        </div>`;
+                }).join('');
+
+                const aList = document.getElementById('esAddonsList');
+                const aCont = document.getElementById('esAddonsContainer');
+
+                if (group.addons.length === 0) {
+                    aCont.classList.add('hidden');
+                    aList.innerHTML = "";
+                } else {
+                    aCont.classList.remove('hidden');
+                    aList.innerHTML = group.addons.map((item, i) => {
+                        const qty = currentSelection.addons[i] || 0;
+                        const isActive = qty > 0;
+                        const activeClasses = isActive ? "border-blue-400 bg-blue-50/40 shadow-sm" : "border-slate-200 bg-white hover:border-blue-300";
+
+                        return `
+                            <div id="esAddonCard_${i}" class="p-3 rounded-xl border ${activeClasses} transition-colors">
+                                <div class="flex justify-between items-center gap-3">
+                                    <span class="font-semibold text-sm text-slate-800 leading-tight">${esc(item.name)}</span>
+                                    <div class="flex items-center gap-2 bg-white border border-slate-200 p-1 rounded-full shadow-sm shrink-0">
+                                        <button class="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 font-bold transition-colors text-xs" onclick="changeAddonQty(${i}, -1)">-</button>
+                                        <span id="esAddonQty_${i}" class="w-5 text-center font-bold text-sm ${isActive ? 'text-slate-900' : 'text-slate-400'}">${qty}</span>
+                                        <button class="w-6 h-6 flex items-center justify-center bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 font-bold transition-colors text-xs" onclick="changeAddonQty(${i}, 1)">+</button>
+                                    </div>
+                                </div>
+                                ${_renderFourPricesBadges(item.prices)}
+                            </div>`;
+                    }).join('');
+                }
+
+                document.getElementById('esBaseQtyVal').innerText = currentSelection.baseQty;
+
+                const modal = document.getElementById('esModal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                document.body.classList.add('modal-open');
+                updateCalc();
+            };
+
+            window.closeModal = function() { 
+                const modal = document.getElementById('esModal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                document.body.classList.remove('modal-open'); 
+            };
+
+            window.selectBase = function(newIdx) {
+                if (!currentSelection || currentSelection.baseIdx === newIdx) return;
+                const prevIdx = currentSelection.baseIdx;
+                currentSelection.baseIdx = newIdx;
+
+                const bList = document.getElementById('esBasesList');
+                const toggleRow = (idx, active) => {
+                    const row = bList.querySelector(`[data-base-row="${idx}"]`);
+                    if (!row) return;
+                    const radio = bList.querySelector(`[data-base-radio="${idx}"]`);
+                    const title = bList.querySelector(`[data-base-title="${idx}"]`);
+                    row.className = `p-3 rounded-xl border ${active ? 'border-blue-600 bg-blue-50/40 ring-1 ring-blue-600 shadow-sm' : 'border-slate-200 bg-white hover:border-blue-300'} cursor-pointer transition-all`;
+                    if (radio) radio.className = `w-5 h-5 rounded-full flex-shrink-0 ${active ? 'border-[5px] border-blue-600 bg-white' : 'border-2 border-slate-300 bg-white'} shadow-sm transition-all`;
+                    if (title) title.className = `font-semibold text-sm ${active ? 'text-blue-950' : 'text-slate-800'}`;
+                };
+
+                toggleRow(prevIdx, false);
+                toggleRow(newIdx, true);
+                updateCalc();
+            };
+
+            window.changeBaseQty = function(delta) {
+                let newQty = currentSelection.baseQty + delta;
+                if (newQty < 1) newQty = 1;
+                currentSelection.baseQty = newQty;
+                document.getElementById('esBaseQtyVal').innerText = newQty;
+                updateCalc();
+            };
+
+            window.changeAddonQty = function(idx, delta) {
+                let currentQty = currentSelection.addons[idx] || 0;
+                let newQty = currentQty + delta;
+                if (newQty < 0) newQty = 0;
+                
+                if (newQty === 0) delete currentSelection.addons[idx];
+                else currentSelection.addons[idx] = newQty;
+                
+                const span = document.getElementById(`esAddonQty_${idx}`);
+                const card = document.getElementById(`esAddonCard_${idx}`);
+                if (span) {
+                    span.innerText = newQty;
+                    span.classList.toggle('text-slate-900', newQty > 0);
+                    span.classList.toggle('text-slate-400', newQty === 0);
+                }
+                if (card) {
+                    card.className = `p-3 rounded-xl border ${newQty > 0 ? 'border-blue-400 bg-blue-50/40 shadow-sm' : 'border-slate-200 bg-white hover:border-blue-300'} transition-colors`;
+                }
+                updateCalc();
+            };
+
+            // Расчет стоимости внутри модального окна по конкретному ключу цены
+            function _calcModalSingleKey(group, base, key) {
+                let total = 0;
+                let percentStr = "";
+                let hasRequest = false;
+
+                const bp = base.prices ? base.prices[key] : { val: 0, isPercent: false, isRequest: false };
+                if (bp.isRequest) {
+                    hasRequest = true;
+                } else if (bp.isPercent) {
+                    percentStr = ` + ${bp.val}%`;
+                } else {
+                    total += bp.val * currentSelection.baseQty;
+                }
+
+                for (const [idx, qty] of Object.entries(currentSelection.addons)) {
+                    const add = group.addons[idx];
+                    if (!add) continue;
+                    const ap = add.prices[key];
+                    if (ap.isRequest) {
+                        hasRequest = true;
+                    } else if (ap.isPercent) {
+                        percentStr += ` + ${ap.val}%`;
+                    } else {
+                        total += ap.val * qty;
+                    }
+                }
+
+                if (total === 0 && hasRequest) return "По запросу" + percentStr;
+                if (hasRequest) return fmtCurr(total, key) + " + По запросу" + percentStr;
+                return fmtCurr(total, key) + percentStr;
+            }
+
+            window.updateCalc = function() {
+                const group = database[currentSelection.groupIdx];
+                if (!group) return;
+                const base = group.items.length ? group.items[currentSelection.baseIdx] : { prices: {} };
+
+                document.getElementById('esModalPriceRub').innerText = _calcModalSingleKey(group, base, 'finalRub');
+                document.getElementById('esModalPriceBuy').innerText = _calcModalSingleKey(group, base, 'buyRub');
+                document.getElementById('esModalPriceUsd').innerText = _calcModalSingleKey(group, base, 'finalUsd');
+                document.getElementById('esModalPriceByn').innerText = _calcModalSingleKey(group, base, 'finalByn');
+            };
+
+            window.confirmAddToCart = function() {
+                const group = database[currentSelection.groupIdx];
+                const defaultPrices = {
+                    buyRub:   { val: 0, isPercent: false, isRequest: false },
+                    finalRub: { val: 0, isPercent: false, isRequest: false },
+                    finalUsd: { val: 0, isPercent: false, isRequest: false },
+                    finalByn: { val: 0, isPercent: false, isRequest: false }
+                };
+                const baseItem = group.items.length ? group.items[currentSelection.baseIdx] : { name: "Товар", prices: defaultPrices };
+                const selectedAddons = [];
+                for (const [idx, qty] of Object.entries(currentSelection.addons)) {
+                    selectedAddons.push({ ...group.addons[idx], qty: qty });
+                }
+
+                catalogMemory[currentSelection.groupIdx] = {
+                    groupIdx: currentSelection.groupIdx,
+                    baseIdx: currentSelection.baseIdx,
+                    baseQty: currentSelection.baseQty,
+                    addons: { ...currentSelection.addons }
+                };
+
+                const newItem = { title: group.title, base: baseItem, baseQty: currentSelection.baseQty, addons: selectedAddons };
+
+                if (currentSelection.mode === 'edit') cart[currentSelection.cartIdx] = newItem;
+                else cart.push(newItem);
+
+                closeModal();
+                renderCart();
+
+                if (window.innerWidth <= 768 && cart.length === 1) {
+                    const widget = document.getElementById('esCartWidget');
+                    const arrow = document.getElementById('mobile-cart-arrow');
+                    widget.classList.add('is-open');
+                    arrow.style.transform = 'rotate(180deg)';
+                    if (_mobileCartTimer) clearTimeout(_mobileCartTimer);
+                    _mobileCartTimer = setTimeout(() => {
+                        widget.classList.remove('is-open');
+                        arrow.style.transform = 'rotate(0deg)';
+                        _mobileCartTimer = null;
+                    }, 2500);
+                }
+            };
+
+            window.renderCart = function() {
+                // 1. Считаем фиксированную базу по каждой из 4 цен
+                const fixedSums = { buyRub: 0, finalRub: 0, finalUsd: 0, finalByn: 0 };
+
+                for (let i = 0; i < cart.length; i++) {
+                    const c = cart[i];
+                    PRICE_KEYS.forEach(k => {
+                        const bp = c.base.prices[k];
+                        if (bp && !bp.isPercent && !bp.isRequest) {
+                            fixedSums[k] += bp.val * c.baseQty;
+                        }
+                    });
+                    for (let j = 0; j < c.addons.length; j++) {
+                        const a = c.addons[j];
+                        PRICE_KEYS.forEach(k => {
+                            const ap = a.prices[k];
+                            if (ap && !ap.isPercent && !ap.isRequest) {
+                                fixedSums[k] += ap.val * a.qty;
+                            }
+                        });
+                    }
+                }
+
+                const totals = { ...fixedSums };
+                const globalHasRequest = { buyRub: false, finalRub: false, finalUsd: false, finalByn: false };
+                const list = document.getElementById('esCartItems');
+
+                if (cart.length === 0) {
+                    list.innerHTML = "<div class='text-center py-8 text-slate-400 font-medium text-sm'>Корзина пуста</div>";
+                } else {
+                    const rowsHtml = new Array(cart.length);
+
+                    for (let idx = 0; idx < cart.length; idx++) {
+                        const c = cart[idx];
+                        const itemTotals = { buyRub: 0, finalRub: 0, finalUsd: 0, finalByn: 0 };
+                        const itemHasReq = { buyRub: false, finalRub: false, finalUsd: false, finalByn: false };
+
+                        // Расчет по всем 4 валютам для карточки
+                        PRICE_KEYS.forEach(k => {
+                            const bp = c.base.prices[k];
+                            if (bp.isRequest) {
+                                itemHasReq[k] = true;
+                                globalHasRequest[k] = true;
+                            } else if (bp.isPercent) {
+                                const allVal = (fixedSums[k] * (bp.val / 100)) * c.baseQty;
+                                totals[k] += allVal;
+                                itemTotals[k] += allVal;
+                            } else {
+                                itemTotals[k] += bp.val * c.baseQty;
+                            }
+
+                            for (let j = 0; j < c.addons.length; j++) {
+                                const a = c.addons[j];
+                                const ap = a.prices[k];
+                                if (ap.isRequest) {
+                                    itemHasReq[k] = true;
+                                    globalHasRequest[k] = true;
+                                } else if (ap.isPercent) {
+                                    const allVal = (fixedSums[k] * (ap.val / 100)) * a.qty;
+                                    totals[k] += allVal;
+                                    itemTotals[k] += allVal;
+                                } else {
+                                    itemTotals[k] += ap.val * a.qty;
+                                }
+                            }
+                        });
+
+                        // Текст основной комплектации (по главной цене Руб РФ)
+                        const bpMain = c.base.prices.finalRub;
+                        let basePriceText = "";
+                        if (bpMain.isRequest) {
+                            basePriceText = `По запросу${c.baseQty > 1 ? ' (x' + c.baseQty + ')' : ''}`;
+                        } else if (bpMain.isPercent) {
+                            const oneVal = fixedSums.finalRub * (bpMain.val / 100);
+                            basePriceText = `${bpMain.val}% (${fmtCurr(oneVal, 'finalRub')} x ${c.baseQty})`;
+                        } else {
+                            basePriceText = `${fmtCurr(bpMain.val, 'finalRub')} x ${c.baseQty}`;
+                        }
+
+                        // Строки допов
+                        const addonLines = [];
+                        for (let j = 0; j < c.addons.length; j++) {
+                            const a = c.addons[j];
+                            const apMain = a.prices.finalRub;
+                            let aText = "";
+                            if (apMain.isRequest) {
+                                aText = `По запросу${a.qty > 1 ? ' (x' + a.qty + ')' : ''}`;
+                            } else if (apMain.isPercent) {
+                                const oneVal = fixedSums.finalRub * (apMain.val / 100);
+                                aText = `${apMain.val}% (${fmtCurr(oneVal, 'finalRub')}) x ${a.qty}`;
+                            } else {
+                                aText = `${fmtCurr(apMain.val, 'finalRub')} x ${a.qty}`;
+                            }
+                            addonLines.push(`<div class="text-xs text-slate-500 mb-0.5"><span class="text-slate-400">+</span> ${esc(a.name)}: ${aText}</div>`);
+                        }
+
+                        const fmtRowTotal = (k) => {
+                            if (itemTotals[k] === 0 && itemHasReq[k]) return "По запросу";
+                            if (itemHasReq[k]) return fmtCurr(itemTotals[k], k) + " + Запрос";
+                            return fmtCurr(itemTotals[k], k);
+                        };
+
+                        rowsHtml[idx] = `
+                            <div class="bg-white p-3.5 rounded-[1rem] border border-slate-100 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.03)] mb-3 relative cursor-pointer hover:border-blue-300 transition-colors group" onclick="openModalFromCart(${idx})">
+                                <button class="absolute top-2 right-2 text-slate-300 hover:text-rose-500 transition-colors p-2 rounded-lg opacity-100 md:opacity-0 group-hover:opacity-100 focus:opacity-100" onclick="removeFromCart(event, ${idx})">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                                <div class="font-bold text-slate-800 text-sm pr-6 mb-1 leading-tight">${esc(c.title)}</div>
+                                <div class="text-xs font-semibold text-slate-500 mb-1">${esc(c.base.name)} — ${basePriceText}</div>
+                                ${addonLines.length ? `<div class="mt-2 mb-2 pl-2 border-l-2 border-slate-100">${addonLines.join('')}</div>` : ''}
+                                
+                                <div class="mt-2.5 pt-2.5 border-t border-slate-100 border-dashed space-y-1.5">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Итого РФ</span>
+                                        <span class="font-extrabold text-sm text-slate-900">${fmtRowTotal('finalRub')}</span>
+                                    </div>
+                                    <div class="grid grid-cols-3 gap-1 text-[10px]">
+                                        <div class="bg-slate-50 px-1.5 py-1 rounded text-slate-600 truncate">
+                                            <span class="text-slate-400 block text-[8px] uppercase">Закупка</span>
+                                            <strong class="font-bold">${fmtRowTotal('buyRub')}</strong>
+                                        </div>
+                                        <div class="bg-emerald-50/60 px-1.5 py-1 rounded text-emerald-700 truncate">
+                                            <span class="text-emerald-500 block text-[8px] uppercase">USD</span>
+                                            <strong class="font-bold">${fmtRowTotal('finalUsd')}</strong>
+                                        </div>
+                                        <div class="bg-indigo-50/60 px-1.5 py-1 rounded text-indigo-700 truncate">
+                                            <span class="text-indigo-400 block text-[8px] uppercase">BYN</span>
+                                            <strong class="font-bold">${fmtRowTotal('finalByn')}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>`;
+                    }
+                    list.innerHTML = rowsHtml.join('');
+                }
+
+                const fmtGlobal = (k) => {
+                    if (totals[k] === 0 && globalHasRequest[k]) return "По запросу";
+                    if (globalHasRequest[k]) return fmtCurr(totals[k], k) + " + Запрос";
+                    return fmtCurr(totals[k], k);
+                };
+
+                document.getElementById('esTotalRub').innerText = fmtGlobal('finalRub');
+                document.getElementById('esTotalBuy').innerText = fmtGlobal('buyRub');
+                document.getElementById('esTotalUsd').innerText = fmtGlobal('finalUsd');
+                document.getElementById('esTotalByn').innerText = fmtGlobal('finalByn');
+
+                const badge = document.getElementById('cart-count-badge');
+                if (cart.length > 0) {
+                    badge.innerText = cart.length;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+
+                _savePersistedCart();
+            };
+
+            window.removeFromCart = function(e, i) { 
+                e.stopPropagation();
+                let item = cart[i];
+                let groupIdx = database.findIndex(g => g.title === item.title);
+                if (groupIdx !== -1) delete catalogMemory[groupIdx];
+                cart.splice(i, 1);
+                renderCart(); 
+            };
+
+            window.clearCart = function(e) { 
+                if (e) e.stopPropagation();
+                cart = [];
+                catalogMemory = {};
+                renderCart(); 
+                if (window.innerWidth <= 768) {
+                    document.getElementById('esCartWidget').classList.remove('is-open');
+                    document.getElementById('mobile-cart-arrow').style.transform = 'rotate(0deg)';
+                }
+            };
+
+            window.toggleMobileCart = function() {
+                if (_mobileCartTimer) {
+                    clearTimeout(_mobileCartTimer);
+                    _mobileCartTimer = null;
+                }
+                if (window.innerWidth <= 768) {
+                    const widget = document.getElementById('esCartWidget');
+                    const arrow = document.getElementById('mobile-cart-arrow');
+                    widget.classList.toggle('is-open');
+                    arrow.style.transform = widget.classList.contains('is-open') ? 'rotate(180deg)' : 'rotate(0deg)';
+                }
+            };
+
+            document.getElementById('esSearch').addEventListener('input', (e) => renderCatalog(e.target.value));
+
+            // Мгновенная отрисовка из кэша сессии (0 мс)
+            _loadPersistedCart();
+            try {
+                const cachedCsv = sessionStorage.getItem(CACHE_KEY_CSV);
+                if (cachedCsv) {
+                    const parsedRows = JSON.parse(cachedCsv);
+                    if (Array.isArray(parsedRows) && parsedRows.length > 0) {
+                        processData(parsedRows);
+                    }
+                }
+            } catch (e) {}
+            if (cart.length > 0) renderCart();
+        })();
+    </script>
+</body>
+</html>
