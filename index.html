@@ -35,7 +35,6 @@
 
         body.modal-open { overflow: hidden; touch-action: none; }
 
-        /* Позиционирование липкого поиска и корзины без верхнего навбара */
         #search-container {
             top: 16px;
         }
@@ -182,18 +181,16 @@
 
     <script>
         // ==========================================================
-        // ИНДЕКСЫ СТОЛБЦОВ ГУГЛ ТАБЛИЦЫ (A=0, B=1 пропускаем, C=2, D=3, E=4, F=5)
+        // ИНДЕКСЫ СТОЛБЦОВ ГУГЛ ТАБЛИЦЫ (A=0, B=1, C=2, D=3, E=4, F=5)
         // ==========================================================
         const COL_NAME = 0;      // A — Наименование позиции / категории
-        // Столбец B (индекс 1) — техническое поле, полностью игнорируется
+        const COL_TECH_B = 1;    // B — Технический столбец (используется ТОЛЬКО для проверки "%" или "запрос", если C-F пустые)
         const COL_BUY_RUB = 2;   // C — Цена закупки, Руб РФ
         const COL_FINAL_RUB = 3; // D — Итоговая стоимость, Руб РФ
         const COL_FINAL_USD = 4; // E — Итоговая стоимость, Доллары
         const COL_FINAL_BYN = 5; // F — Итоговая стоимость, Руб РБ
 
-        // Замените ссылку ниже на CSV-ссылку вашей новой таблицы при необходимости
-        const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fReX-VT02iS-FuldAJmU2LM--lmwIx-cI11lmwNLL-lAaUTHB9_Vqy61S6NCPt6rk-f4/pub?gid=0&single=true&output=csv" + "&t=" + new Date().getTime();
-
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fReX-VT02iS-FuldAJmU2LM--lmwIx-cI11lmwNLL-lAaUTHB9_Vqy61S6NCPt6rk-f4/pub?gid=0&single=true&output=csv" + "&t=" + new Date().getTime();
         const PRICE_KEYS = ['buyRub', 'finalRub', 'finalUsd', 'finalByn'];
         const CURRENCY_META = {
             buyRub:   { symbol: '₽',   label: 'Закупка РФ' },
@@ -229,7 +226,6 @@
             lastTouchEnd = now;
         }, false);
 
-        // Форматирование одиночной цены (число / процент / по запросу)
         function formatSinglePrice(pObj, key) {
             if (!pObj) return fmtCurr(0, key);
             if (pObj.isRequest) return "По запросу";
@@ -237,7 +233,6 @@
             return fmtCurr(pObj.val, key);
         }
 
-        // Парсинг ячейки цены (поддержка дробных чисел для USD/BYN, процентов и "по запросу")
         function parsePrice(str) {
             if (str === undefined || str === null) return { val: 0, isPercent: false, isRequest: false };
             let s = str.toString().trim();
@@ -249,7 +244,6 @@
             if (s.toLowerCase().includes('запрос')) {
                 return { val: 0, isPercent: false, isRequest: true };
             }
-            // Поддержка пробелов-разделителей тысяч и запятой/точки для дробной части
             let normalized = s.replace(/\s+/g, '').replace(',', '.').replace(/[^0-9.]/g, '');
             let parts = normalized.split('.');
             if (parts.length > 2) {
@@ -258,12 +252,29 @@
             return { val: parseFloat(normalized) || 0, isPercent: false, isRequest: false };
         }
 
+        // Парсинг 4 цен строки (с поддержкой общих процентов вроде "10% от чека" из столбца B, если C-F пустые)
         function parseItemPrices(row) {
+            const techRaw = row[COL_TECH_B] !== undefined && row[COL_TECH_B] !== null ? String(row[COL_TECH_B]).trim() : "";
+            const fallbackSpecial = (techRaw.includes('%') || techRaw.toLowerCase().includes('запрос'))
+                ? parsePrice(techRaw)
+                : null;
+
+            const resolveCol = (colIdx) => {
+                const cell = row[colIdx];
+                if (cell !== undefined && cell !== null && String(cell).trim() !== "") {
+                    return parsePrice(cell);
+                }
+                if (fallbackSpecial) {
+                    return { ...fallbackSpecial };
+                }
+                return { val: 0, isPercent: false, isRequest: false };
+            };
+
             return {
-                buyRub:   parsePrice(row[COL_BUY_RUB]),
-                finalRub: parsePrice(row[COL_FINAL_RUB]),
-                finalUsd: parsePrice(row[COL_FINAL_USD]),
-                finalByn: parsePrice(row[COL_FINAL_BYN])
+                buyRub:   resolveCol(COL_BUY_RUB),
+                finalRub: resolveCol(COL_FINAL_RUB),
+                finalUsd: resolveCol(COL_FINAL_USD),
+                finalByn: resolveCol(COL_FINAL_BYN)
             };
         }
 
@@ -301,12 +312,12 @@
         }
 
         // ==========================================================
-        // ОСНОВНОЙ МОДУЛЬ РЕНДЕРА И КЭШИРОВАНИЯ (v2.2 Multi-Currency)
+        // ОСНОВНОЙ МОДУЛЬ РЕНДЕРА И КЭШИРОВАНИЯ (v2.3 Multi-Currency)
         // ==========================================================
         (() => {
-            const CACHE_KEY_CSV = 'es_mc_catalog_csv_v1';
-            const CACHE_KEY_CART = 'es_mc_catalog_cart_v1';
-            const CACHE_KEY_MEM = 'es_mc_catalog_mem_v1';
+            const CACHE_KEY_CSV = 'es_mc_catalog_csv_v2';
+            const CACHE_KEY_CART = 'es_mc_catalog_cart_v2';
+            const CACHE_KEY_MEM = 'es_mc_catalog_mem_v2';
 
             let _catalogCards = [];
             let _emptyStateEl = null;
@@ -332,7 +343,6 @@
                 } catch (e) {}
             }
 
-            // Вычисление минимальной цены группы по конкретному ключу валюты
             function _calcGroupMinText(group, key) {
                 let minP = Infinity;
                 for (let i = 0; i < group.items.length; i++) {
@@ -369,9 +379,15 @@
 
                     const nameLower = name.toLowerCase();
 
-                    // Проверяем, пусты ли все 4 ценовых столбца (C, D, E, F)
-                    const hasAnyPrice = [row[COL_BUY_RUB], row[COL_FINAL_RUB], row[COL_FINAL_USD], row[COL_FINAL_BYN]]
+                    // Проверяем наличие цен в C, D, E, F
+                    const hasMainPrices = [row[COL_BUY_RUB], row[COL_FINAL_RUB], row[COL_FINAL_USD], row[COL_FINAL_BYN]]
                         .some(cell => cell !== undefined && cell !== null && String(cell).trim() !== "");
+
+                    // Проверяем, есть ли в тех. столбце B специальная отметка ("10% от чека" или "по запросу")
+                    const techRaw = row[COL_TECH_B] !== undefined && row[COL_TECH_B] !== null ? String(row[COL_TECH_B]).trim() : "";
+                    const hasTechSpecial = techRaw.includes('%') || techRaw.toLowerCase().includes('запрос');
+
+                    const hasAnyPrice = hasMainPrices || hasTechSpecial;
 
                     const isServiceRow = nameLower.includes("позиция")
                         || nameLower.includes("себестоимость")
@@ -420,6 +436,7 @@
                 _buildCatalogDOMOnce();
                 const searchInput = document.getElementById('esSearch');
                 renderCatalog(searchInput ? searchInput.value : "");
+                if (cart.length > 0) renderCart();
             };
 
             function _buildCatalogDOMOnce() {
@@ -685,7 +702,6 @@
                 updateCalc();
             };
 
-            // Расчет стоимости внутри модального окна по конкретному ключу цены
             function _calcModalSingleKey(group, base, key) {
                 let total = 0;
                 let percentStr = "";
@@ -695,7 +711,7 @@
                 if (bp.isRequest) {
                     hasRequest = true;
                 } else if (bp.isPercent) {
-                    percentStr = ` + ${bp.val}%`;
+                    percentStr = (total === 0 ? `${bp.val}% от чека` : ` + ${bp.val}%`);
                 } else {
                     total += bp.val * currentSelection.baseQty;
                 }
@@ -713,7 +729,8 @@
                     }
                 }
 
-                if (total === 0 && hasRequest) return "По запросу" + percentStr;
+                if (total === 0 && hasRequest) return "По запросу" + (percentStr ? " " + percentStr : "");
+                if (total === 0 && percentStr) return percentStr;
                 if (hasRequest) return fmtCurr(total, key) + " + По запросу" + percentStr;
                 return fmtCurr(total, key) + percentStr;
             }
@@ -773,7 +790,7 @@
             };
 
             window.renderCart = function() {
-                // 1. Считаем фиксированную базу по каждой из 4 цен
+                // 1. Считаем фиксированную сумму чека по каждой из 4 валют
                 const fixedSums = { buyRub: 0, finalRub: 0, finalUsd: 0, finalByn: 0 };
 
                 for (let i = 0; i < cart.length; i++) {
@@ -809,7 +826,7 @@
                         const itemTotals = { buyRub: 0, finalRub: 0, finalUsd: 0, finalByn: 0 };
                         const itemHasReq = { buyRub: false, finalRub: false, finalUsd: false, finalByn: false };
 
-                        // Расчет по всем 4 валютам для карточки
+                        // Расчет по всем 4 валютам (включая +10% от чека для Расширенной гарантии)
                         PRICE_KEYS.forEach(k => {
                             const bp = c.base.prices[k];
                             if (bp.isRequest) {
@@ -839,7 +856,6 @@
                             }
                         });
 
-                        // Текст основной комплектации (по главной цене Руб РФ)
                         const bpMain = c.base.prices.finalRub;
                         let basePriceText = "";
                         if (bpMain.isRequest) {
@@ -851,7 +867,6 @@
                             basePriceText = `${fmtCurr(bpMain.val, 'finalRub')} x ${c.baseQty}`;
                         }
 
-                        // Строки допов
                         const addonLines = [];
                         for (let j = 0; j < c.addons.length; j++) {
                             const a = c.addons[j];
