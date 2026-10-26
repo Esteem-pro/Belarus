@@ -100,22 +100,22 @@
                         <div class="p-4 sm:p-5 bg-white border-t border-slate-100 shrink-0">
                             <div class="space-y-2 mb-4">
                                 <div class="flex justify-between items-baseline">
-                                    <span class="text-slate-500 text-xs font-semibold">Итоговая, Руб РФ:</span>
-                                    <span id="esTotalRub" class="text-xl font-extrabold text-slate-900 tracking-tight">0 ₽</span>
+                                    <span class="text-slate-500 text-xs font-semibold">Закупка РФ:</span>
+                                    <span id="esTotalBuy" class="text-xl font-extrabold text-slate-900 tracking-tight">0 ₽</span>
                                 </div>
                                 
                                 <div class="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100">
-                                    <div class="bg-slate-50 p-2 rounded-lg border border-slate-200/60">
-                                        <div class="text-[10px] font-semibold text-slate-400 uppercase leading-none mb-1">Закупка РФ</div>
-                                        <div id="esTotalBuy" class="text-xs font-bold text-slate-700 truncate">0 ₽</div>
+                                    <div class="bg-blue-50/60 p-2 rounded-lg border border-blue-200/60">
+                                        <div class="text-[10px] font-semibold text-blue-600/80 uppercase leading-none mb-1">Розница РФ</div>
+                                        <div id="esTotalRub" class="text-xs font-bold text-blue-700 truncate">0 ₽</div>
                                     </div>
                                     <div class="bg-emerald-50/60 p-2 rounded-lg border border-emerald-200/60">
-                                        <div class="text-[10px] font-semibold text-emerald-600/80 uppercase leading-none mb-1">Итого USD</div>
+                                        <div class="text-[10px] font-semibold text-emerald-600/80 uppercase leading-none mb-1">Розница USD</div>
                                         <div id="esTotalUsd" class="text-xs font-bold text-emerald-700 truncate">0 $</div>
                                     </div>
                                     <div class="bg-indigo-50/60 p-2 rounded-lg border border-indigo-200/60">
-                                        <div class="text-[10px] font-semibold text-indigo-600/80 uppercase leading-none mb-1">Итого РБ</div>
-                                        <div id="esTotalByn" class="text-xs font-bold text-indigo-700 truncate">0 BYN</div>
+                                        <div class="text-[10px] font-semibold text-indigo-600/80 uppercase leading-none mb-1">Розница РБ</div>
+                                        <div id="esTotalByn" class="text-xs font-bold text-indigo-700 truncate">0 Br</div>
                                     </div>
                                 </div>
                             </div>
@@ -161,6 +161,7 @@
                 </div>
                 
                 <!-- БЛОК ИТОГОВЫХ ЦЕН В МОДАЛКЕ -->
+               <!-- БЛОК ИТОГОВЫХ ЦЕН В МОДАЛКЕ -->
                 <div class="pt-3 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div class="flex-1">
                         <div class="flex items-baseline gap-2">
@@ -194,9 +195,9 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fR
         const PRICE_KEYS = ['buyRub', 'finalRub', 'finalUsd', 'finalByn'];
         const CURRENCY_META = {
             buyRub:   { symbol: '₽',   label: 'Закупка РФ' },
-            finalRub: { symbol: '₽',   label: 'Итого РФ' },
-            finalUsd: { symbol: '$',   label: 'Итого USD' },
-            finalByn: { symbol: 'Br', label: 'Итого РБ' }
+            finalRub: { symbol: '₽',   label: 'Розница РФ' },
+            finalUsd: { symbol: '$',   label: 'Розница USD' },
+            finalByn: { symbol: 'Br', label: 'Розница РБ' }
         };
 
         let database = [];
@@ -451,23 +452,23 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fR
                     const card = document.createElement('div');
                     card.className = 'bg-white p-4 sm:p-5 rounded-[1.5rem] border border-slate-200 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] hover:border-blue-400 hover:shadow-[0_8px_25px_-5px_rgba(0,0,0,0.06)] hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[165px] relative group';
                     card.onclick = () => openModalFromCatalog(idx);
-                    card.innerHTML = `
+                card.innerHTML = `
                         <div class="font-bold text-slate-800 text-sm sm:text-base leading-snug mb-4 group-hover:text-blue-700 transition-colors">${esc(group.title)}</div>
                         <div class="mt-auto pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
                             <div class="bg-blue-50/70 px-2.5 py-1.5 rounded-xl border border-blue-100">
-                                <div class="text-[10px] font-bold text-blue-500 uppercase tracking-tight">Итого РФ</div>
-                                <div class="font-extrabold text-blue-700 text-xs sm:text-sm truncate">${mp.finalRub}</div>
+                                <div class="text-[10px] font-bold text-blue-500 uppercase tracking-tight">Закупка РФ</div>
+                                <div class="font-extrabold text-blue-700 text-xs sm:text-sm truncate">${mp.buyRub}</div>
                             </div>
                             <div class="bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200/70">
-                                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Закупка РФ</div>
-                                <div class="font-bold text-slate-700 text-xs sm:text-sm truncate">${mp.buyRub}</div>
+                                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Розница РФ</div>
+                                <div class="font-bold text-slate-700 text-xs sm:text-sm truncate">${mp.finalRub}</div>
                             </div>
                             <div class="bg-emerald-50/60 px-2.5 py-1.5 rounded-xl border border-emerald-100">
-                                <div class="text-[10px] font-semibold text-emerald-600 uppercase tracking-tight">Итого USD</div>
+                                <div class="text-[10px] font-semibold text-emerald-600 uppercase tracking-tight">Розница USD</div>
                                 <div class="font-bold text-emerald-700 text-xs sm:text-sm truncate">${mp.finalUsd}</div>
                             </div>
                             <div class="bg-indigo-50/60 px-2.5 py-1.5 rounded-xl border border-indigo-100">
-                                <div class="text-[10px] font-semibold text-indigo-500 uppercase tracking-tight">Итого РБ</div>
+                                <div class="text-[10px] font-semibold text-indigo-500 uppercase tracking-tight">Розница РБ</div>
                                 <div class="font-bold text-indigo-700 text-xs sm:text-sm truncate">${mp.finalByn}</div>
                             </div>
                         </div>
@@ -542,23 +543,23 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fR
                 renderModalContent();
             };
 
-            function _renderFourPricesBadges(prices) {
+           function _renderFourPricesBadges(prices) {
                 return `
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mt-2 pt-2 border-t border-slate-200/50 text-[11px]">
                         <div class="bg-blue-50/80 px-2 py-1 rounded-lg">
-                            <span class="text-blue-500 font-medium block text-[9px] uppercase">Итого РФ</span>
-                            <span class="font-extrabold text-blue-700">${formatSinglePrice(prices.finalRub, 'finalRub')}</span>
+                            <span class="text-blue-500 font-medium block text-[9px] uppercase">Закупка РФ</span>
+                            <span class="font-extrabold text-blue-700">${formatSinglePrice(prices.buyRub, 'buyRub')}</span>
                         </div>
                         <div class="bg-slate-100/80 px-2 py-1 rounded-lg">
-                            <span class="text-slate-400 font-medium block text-[9px] uppercase">Закупка РФ</span>
-                            <span class="font-bold text-slate-700">${formatSinglePrice(prices.buyRub, 'buyRub')}</span>
+                            <span class="text-slate-400 font-medium block text-[9px] uppercase">Розница РФ</span>
+                            <span class="font-bold text-slate-700">${formatSinglePrice(prices.finalRub, 'finalRub')}</span>
                         </div>
                         <div class="bg-emerald-50/80 px-2 py-1 rounded-lg">
-                            <span class="text-emerald-600 font-medium block text-[9px] uppercase">Итого USD</span>
+                            <span class="text-emerald-600 font-medium block text-[9px] uppercase">Розница USD</span>
                             <span class="font-bold text-emerald-700">${formatSinglePrice(prices.finalUsd, 'finalUsd')}</span>
                         </div>
                         <div class="bg-indigo-50/80 px-2 py-1 rounded-lg">
-                            <span class="text-indigo-500 font-medium block text-[9px] uppercase">Итого РБ</span>
+                            <span class="text-indigo-500 font-medium block text-[9px] uppercase">Розница РБ</span>
                             <span class="font-bold text-indigo-700">${formatSinglePrice(prices.finalByn, 'finalByn')}</span>
                         </div>
                     </div>
@@ -856,29 +857,29 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fR
                             }
                         });
 
-                        const bpMain = c.base.prices.finalRub;
+                        const bpMain = c.base.prices.buyRub;
                         let basePriceText = "";
                         if (bpMain.isRequest) {
                             basePriceText = `По запросу${c.baseQty > 1 ? ' (x' + c.baseQty + ')' : ''}`;
                         } else if (bpMain.isPercent) {
-                            const oneVal = fixedSums.finalRub * (bpMain.val / 100);
-                            basePriceText = `${bpMain.val}% (${fmtCurr(oneVal, 'finalRub')} x ${c.baseQty})`;
+                            const oneVal = fixedSums.buyRub * (bpMain.val / 100);
+                            basePriceText = `${bpMain.val}% (${fmtCurr(oneVal, 'buyRub')} x ${c.baseQty})`;
                         } else {
-                            basePriceText = `${fmtCurr(bpMain.val, 'finalRub')} x ${c.baseQty}`;
+                            basePriceText = `${fmtCurr(bpMain.val, 'buyRub')} x ${c.baseQty}`;
                         }
 
                         const addonLines = [];
                         for (let j = 0; j < c.addons.length; j++) {
                             const a = c.addons[j];
-                            const apMain = a.prices.finalRub;
+                            const apMain = a.prices.buyRub;
                             let aText = "";
                             if (apMain.isRequest) {
                                 aText = `По запросу${a.qty > 1 ? ' (x' + a.qty + ')' : ''}`;
                             } else if (apMain.isPercent) {
-                                const oneVal = fixedSums.finalRub * (apMain.val / 100);
-                                aText = `${apMain.val}% (${fmtCurr(oneVal, 'finalRub')}) x ${a.qty}`;
+                                const oneVal = fixedSums.buyRub * (apMain.val / 100);
+                                aText = `${apMain.val}% (${fmtCurr(oneVal, 'buyRub')}) x ${a.qty}`;
                             } else {
-                                aText = `${fmtCurr(apMain.val, 'finalRub')} x ${a.qty}`;
+                                aText = `${fmtCurr(apMain.val, 'buyRub')} x ${a.qty}`;
                             }
                             addonLines.push(`<div class="text-xs text-slate-500 mb-0.5"><span class="text-slate-400">+</span> ${esc(a.name)}: ${aText}</div>`);
                         }
@@ -900,20 +901,20 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fR
                                 
                                 <div class="mt-2.5 pt-2.5 border-t border-slate-100 border-dashed space-y-1.5">
                                     <div class="flex justify-between items-center">
-                                        <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Итого РФ</span>
-                                        <span class="font-extrabold text-sm text-slate-900">${fmtRowTotal('finalRub')}</span>
+                                        <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Закупка РФ</span>
+                                        <span class="font-extrabold text-sm text-slate-900">${fmtRowTotal('buyRub')}</span>
                                     </div>
                                     <div class="grid grid-cols-3 gap-1 text-[10px]">
-                                        <div class="bg-slate-50 px-1.5 py-1 rounded text-slate-600 truncate">
-                                            <span class="text-slate-400 block text-[8px] uppercase">Закупка</span>
-                                            <strong class="font-bold">${fmtRowTotal('buyRub')}</strong>
+                                        <div class="bg-blue-50/60 px-1.5 py-1 rounded text-blue-700 truncate">
+                                            <span class="text-blue-500 block text-[8px] uppercase">Розница РФ</span>
+                                            <strong class="font-bold">${fmtRowTotal('finalRub')}</strong>
                                         </div>
                                         <div class="bg-emerald-50/60 px-1.5 py-1 rounded text-emerald-700 truncate">
-                                            <span class="text-emerald-500 block text-[8px] uppercase">USD</span>
+                                            <span class="text-emerald-500 block text-[8px] uppercase">Розница USD</span>
                                             <strong class="font-bold">${fmtRowTotal('finalUsd')}</strong>
                                         </div>
                                         <div class="bg-indigo-50/60 px-1.5 py-1 rounded text-indigo-700 truncate">
-                                            <span class="text-indigo-400 block text-[8px] uppercase">BYN</span>
+                                            <span class="text-indigo-400 block text-[8px] uppercase">Розница РБ</span>
                                             <strong class="font-bold">${fmtRowTotal('finalByn')}</strong>
                                         </div>
                                     </div>
