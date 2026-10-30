@@ -296,8 +296,8 @@ function renderSkeleton() {
             const grid = document.getElementById('esGrid');
             if (!grid || database.length > 0) return;
             const cardHtml = `
-                <div class="bg-white p-4 sm:p-5 rounded-[1.5rem] border border-slate-200 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] animate-pulse flex flex-col justify-between min-h-[290px]">
-                    <div class="w-full aspect-[16/10] bg-slate-200/70 rounded-2xl mb-3.5"></div>
+                <div class="bg-white p-4 sm:p-5 rounded-[1.5rem] border border-slate-200 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] animate-pulse flex flex-col justify-between min-h-[380px]">
+                    <div class="w-full aspect-[3/4] bg-slate-200/70 rounded-2xl mb-3.5"></div>
                     <div class="h-4 bg-slate-200 rounded w-3/4 mb-2.5"></div>
                     <div class="h-4 bg-slate-200 rounded w-1/2 mb-4"></div>
                     <div class="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-slate-100">
@@ -475,7 +475,7 @@ database.forEach((group, idx) => {
                     // Первые 6 карточек грузим сразу, остальные — лениво при прокрутке
                     const loadAttr = idx < 6 ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
                     const imgHtml = group.image ? `
-                        <div class="relative w-full aspect-[16/10] mb-3.5 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100/80 shrink-0">
+                        <div class="relative w-full aspect-[3/4] mb-3.5 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100/80 shrink-0">
                             <img src="${esc(group.image)}" 
                                  alt="${esc(group.title)}"
                                  ${loadAttr}
