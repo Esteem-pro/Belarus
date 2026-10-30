@@ -190,6 +190,19 @@
         const COL_FINAL_RUB = 3; // D — Итоговая стоимость, Руб РФ
         const COL_FINAL_USD = 4; // E — Итоговая стоимость, Доллары
         const COL_FINAL_BYN = 5; // F — Итоговая стоимость, Руб РБ
+        const COL_IMAGE = 6;     // G — Имя файла в папке img/ или прямая ссылка на фото
+
+        function resolveImageUrl(rawCell) {
+            if (rawCell === undefined || rawCell === null) return "";
+            const val = String(rawCell).trim();
+            if (!val) return "";
+            // Если вставлена полная ссылка (http/https) или путь уже начинается с img/
+            if (val.startsWith('http') || val.startsWith('img/') || val.startsWith('./img/')) {
+                return val;
+            }
+            // Если в таблице написано просто "kovriki.webp", автоматически добавляем папку img/
+            return `img/${val}`;
+        }
 
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fReX-VT02iS-FuldAJmU2LM--lmwIx-cI11lmwNLL-lAaUTHB9_Vqy61S6NCPt6rk-f4/pub?gid=0&single=true&output=csv" + "&t=" + new Date().getTime();
         const PRICE_KEYS = ['buyRub', 'finalRub', 'finalUsd', 'finalByn'];
@@ -279,13 +292,14 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fR
             };
         }
 
-        function renderSkeleton() {
+function renderSkeleton() {
             const grid = document.getElementById('esGrid');
             if (!grid || database.length > 0) return;
             const cardHtml = `
-                <div class="bg-white p-4 sm:p-5 rounded-[1.5rem] border border-slate-200 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] animate-pulse flex flex-col justify-between min-h-[160px]">
-                    <div class="h-4 bg-slate-200 rounded w-3/4 mb-3"></div>
-                    <div class="h-4 bg-slate-200 rounded w-1/2 mb-5"></div>
+                <div class="bg-white p-4 sm:p-5 rounded-[1.5rem] border border-slate-200 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] animate-pulse flex flex-col justify-between min-h-[290px]">
+                    <div class="w-full aspect-[16/10] bg-slate-200/70 rounded-2xl mb-3.5"></div>
+                    <div class="h-4 bg-slate-200 rounded w-3/4 mb-2.5"></div>
+                    <div class="h-4 bg-slate-200 rounded w-1/2 mb-4"></div>
                     <div class="grid grid-cols-2 gap-2 mt-auto pt-3 border-t border-slate-100">
                         <div class="h-8 bg-slate-100 rounded-lg"></div>
                         <div class="h-8 bg-slate-100 rounded-lg"></div>
@@ -316,7 +330,7 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fR
         // ОСНОВНОЙ МОДУЛЬ РЕНДЕРА И КЭШИРОВАНИЯ (v2.3 Multi-Currency)
         // ==========================================================
         (() => {
-            const CACHE_KEY_CSV = 'es_mc_catalog_csv_v2';
+            const CACHE_KEY_CSV = 'es_mc_catalog_csv_v3';
             const CACHE_KEY_CART = 'es_mc_catalog_cart_v2';
             const CACHE_KEY_MEM = 'es_mc_catalog_mem_v2';
 
@@ -403,8 +417,13 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fR
                         continue;
                     }
 
-                    if (isHeader) {
-                        currentGroup = { title: name, items: [], addons: [] };
+                   if (isHeader) {
+                        currentGroup = { 
+                            title: name, 
+                            image: resolveImageUrl(row[COL_IMAGE]), 
+                            items: [], 
+                            addons: [] 
+                        };
                         database.push(currentGroup);
                         isAddons = false;
                     } else if (currentGroup && !isServiceRow) {
@@ -447,12 +466,28 @@ const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT4kZkW_Vm7fR
                 const frag = document.createDocumentFragment();
                 _catalogCards = [];
 
-                database.forEach((group, idx) => {
+database.forEach((group, idx) => {
                     const mp = group._minPrices;
                     const card = document.createElement('div');
                     card.className = 'bg-white p-4 sm:p-5 rounded-[1.5rem] border border-slate-200 shadow-[0_4px_20px_-2px_rgba(0,0,0,0.03)] hover:border-blue-400 hover:shadow-[0_8px_25px_-5px_rgba(0,0,0,0.06)] hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between min-h-[165px] relative group';
                     card.onclick = () => openModalFromCatalog(idx);
-               card.innerHTML = `
+
+                    // Первые 6 карточек грузим сразу, остальные — лениво при прокрутке
+                    const loadAttr = idx < 6 ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"';
+                    const imgHtml = group.image ? `
+                        <div class="relative w-full aspect-[16/10] mb-3.5 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100/80 shrink-0">
+                            <img src="${esc(group.image)}" 
+                                 alt="${esc(group.title)}"
+                                 ${loadAttr}
+                                 decoding="async"
+                                 onload="this.classList.remove('opacity-0')"
+                                 onerror="this.parentElement.classList.add('hidden')"
+                                 class="w-full h-full object-cover object-center opacity-0 transition-all duration-300 group-hover:scale-105">
+                        </div>
+                    ` : '';
+
+                    card.innerHTML = `
+                        ${imgHtml}
                         <div class="font-bold text-slate-800 text-sm sm:text-base leading-snug mb-4 group-hover:text-blue-700 transition-colors">${esc(group.title)}</div>
                         <div class="mt-auto pt-3 border-t border-slate-100 grid grid-cols-2 gap-1.5 sm:gap-2 tabular-nums">
                             <div class="bg-blue-50/70 px-2 py-1.5 rounded-xl border border-blue-100 min-w-0">
