@@ -75,7 +75,7 @@
             
             <!-- СЕТКА КАТАЛОГА -->
             <div class="flex-1 w-full">
-                <div id="esGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-5">
+                <div id="esGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-5">
                 </div>
             </div>
 
@@ -499,26 +499,26 @@
                         </div>
                     `;
 
-                    // 4. Собираем карточку
+// 4. Собираем карточку (компактные плашки без вылета текста за края)
                     card.innerHTML = `
                         ${imgHtml}
-                        <div class="font-bold text-slate-800 text-sm sm:text-base leading-snug mb-4 group-hover:text-blue-700 transition-colors">${esc(group.title)}</div>
-                        <div class="mt-auto pt-3 border-t border-slate-100 grid grid-cols-2 gap-1.5 sm:gap-2 tabular-nums">
-                            <div class="bg-blue-50/70 px-2 py-1.5 rounded-xl border border-blue-100 min-w-0">
-                                <div class="text-[10px] font-bold text-blue-500 uppercase tracking-tight">Закупка РФ</div>
-                                <div class="font-extrabold text-blue-700 text-xs sm:text-[13px] tracking-tight whitespace-nowrap">${mp.buyRub}</div>
+                        <div class="font-bold text-slate-800 text-sm sm:text-base leading-snug mb-3.5 group-hover:text-blue-700 transition-colors">${esc(group.title)}</div>
+                        <div class="mt-auto pt-3 border-t border-slate-100 grid grid-cols-2 gap-1.5 tabular-nums">
+                            <div class="bg-blue-50/70 px-2.5 py-1.5 rounded-xl border border-blue-100 min-w-0 overflow-hidden">
+                                <div class="text-[9px] font-bold text-blue-500 uppercase tracking-tight whitespace-nowrap truncate">Закупка РФ</div>
+                                <div class="font-extrabold text-blue-700 text-[11px] sm:text-xs tracking-tight whitespace-nowrap truncate">${mp.buyRub}</div>
                             </div>
-                            <div class="bg-slate-50 px-2 py-1.5 rounded-xl border border-slate-200/70 min-w-0">
-                                <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-tight">Розница РФ</div>
-                                <div class="font-bold text-slate-700 text-xs sm:text-[13px] tracking-tight whitespace-nowrap">${mp.finalRub}</div>
+                            <div class="bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200/70 min-w-0 overflow-hidden">
+                                <div class="text-[9px] font-semibold text-slate-400 uppercase tracking-tight whitespace-nowrap truncate">Розница РФ</div>
+                                <div class="font-bold text-slate-700 text-[11px] sm:text-xs tracking-tight whitespace-nowrap truncate">${mp.finalRub}</div>
                             </div>
-                            <div class="bg-emerald-50/60 px-2 py-1.5 rounded-xl border border-emerald-100 min-w-0">
-                                <div class="text-[10px] font-semibold text-emerald-600 uppercase tracking-tight">Розница USD</div>
-                                <div class="font-bold text-emerald-700 text-xs sm:text-[13px] tracking-tight whitespace-nowrap">${mp.finalUsd}</div>
+                            <div class="bg-emerald-50/60 px-2.5 py-1.5 rounded-xl border border-emerald-100 min-w-0 overflow-hidden">
+                                <div class="text-[9px] font-semibold text-emerald-600 uppercase tracking-tight whitespace-nowrap truncate">Розница USD</div>
+                                <div class="font-bold text-emerald-700 text-[11px] sm:text-xs tracking-tight whitespace-nowrap truncate">${mp.finalUsd}</div>
                             </div>
-                            <div class="bg-indigo-50/60 px-2 py-1.5 rounded-xl border border-indigo-100 min-w-0">
-                                <div class="text-[10px] font-semibold text-indigo-500 uppercase tracking-tight">Розница РБ</div>
-                                <div class="font-bold text-indigo-700 text-xs sm:text-[13px] tracking-tight whitespace-nowrap">${mp.finalByn}</div>
+                            <div class="bg-indigo-50/60 px-2.5 py-1.5 rounded-xl border border-indigo-100 min-w-0 overflow-hidden">
+                                <div class="text-[9px] font-semibold text-indigo-500 uppercase tracking-tight whitespace-nowrap truncate">Розница РБ</div>
+                                <div class="font-bold text-indigo-700 text-[11px] sm:text-xs tracking-tight whitespace-nowrap truncate">${mp.finalByn}</div>
                             </div>
                         </div>
                     `;
